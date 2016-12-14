@@ -1,0 +1,16 @@
+*~
+.testrepository
+*.sw?
+*.pyc
+.tox
+*.egg
+*.egg-info
+dist
+*.qcow2
+*.raw
+*.initrd
+*.vmlinuz
+build
+AUTHORS
+ChangeLog
+bin/diskimage_builder
