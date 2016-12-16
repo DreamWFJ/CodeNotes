@@ -112,6 +112,7 @@ function run_d_in_target () {
 }
 
 function finalise_base () {
+    # 执行元素目录下的cleanup.d文件夹下的文件
     TARGET_ROOT=$TMP_MOUNT_PATH run_d cleanup
     # If the file has been set immutable, we probably want to keep it
     # lsattr 查看文件的特殊权限

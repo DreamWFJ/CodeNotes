@@ -172,6 +172,7 @@ COMPRESS_IMAGE="true"
 export DIB_ROOT_LABEL=""
 DIB_DEFAULT_INSTALLTYPE=${DIB_DEFAULT_INSTALLTYPE:-"source"}
 MKFS_OPTS=""
+# 该变量干嘛用的--------------------------------------------------------------？？
 ACI_MANIFEST=${ACI_MANIFEST:-}
 DOCKER_TARGET=""
 TEMP=`getopt -o a:ho:t:xucnp: -l checksum,no-tmpfs,offline,help,version,min-tmpfs:,image-size:,image-cache:,max-online-resize:,mkfs-options:,qemu-img-options:,ramdisk-element:,root-label:,install-type:,docker-target: -n $SCRIPTNAME -- "$@"`
@@ -451,36 +452,47 @@ if [ "$FS_TYPE" = "ext4" ] ; then
     du_size=$(( $du_size + 65536 ))
   fi
 fi
-
+# rounding down 是舍入的意思
 # Rounding down size so that is is a multiple of 64, works around a bug in
 # qemu-img that may occur when compressing raw images that aren't a multiple
 # of 64k. https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1180021
 du_size=$(echo "$du_size" | awk ' { if ($1 % 64 != 0) print $1 + 64 - ( $1 % 64); else print $1; } ')
+# truncate 将文件缩减或扩展至指定大小，如果指定文件不存在则创建。 -s 指定大小
 truncate -s${du_size}K $TMP_IMAGE_PATH
 
 if [ -n "$MAX_ONLINE_RESIZE" ]; then
     MKFS_OPTS="-E resize=$MAX_ONLINE_RESIZE $MKFS_OPTS"
 fi
-
+# losetup此命令用来设置循环设备。循环设备可把文件虚拟成块设备，籍此来模拟整个文件系统，让用户得以将其视为硬盘驱动器，光驱或软驱等设备，并挂入当作目录来使用
+# losetup --show 表示打印建立的设备名称，-f 指定建立的设备
 LOOPDEV=$(sudo losetup --show -f $TMP_IMAGE_PATH)
 export EXTRA_UNMOUNT="detach_loopback $LOOPDEV"
 export IMAGE_BLOCK_DEVICE=$LOOPDEV
+# 执行元素中block-device.d文件夹下的文件 -- 参考partitioning-sfdisk元素
 eval_run_d block-device "IMAGE_BLOCK_DEVICE="
+# mkfs 建立linux档案系统在特定的分区上。 -t 指定档案系统的类型，默认为ext2，-L 建立label，
 sudo mkfs $MKFS_OPTS -t $FS_TYPE -L ${DIB_ROOT_LABEL} ${IMAGE_BLOCK_DEVICE}
 # Tuning the rootfs uuid works only for ext filesystems.
 if echo "$FS_TYPE" | grep -q "^ext"; then
+    # tune2fs 调整/查看ext2/ext3文件系统的文件系统参数，Windows下面如果出现意外断电死机情况，下次开机一般都会出现系统自检。
+    #   Linux系统下面也有文件系统自检，而且是可以通过tune2fs命令，自行定义自检周期及方式
+    #   -U 指定UUID
     sudo tune2fs -U ${DIB_IMAGE_ROOT_FS_UUID} ${IMAGE_BLOCK_DEVICE}
 fi
 mkdir $TMP_BUILD_DIR/mnt
 sudo mount ${IMAGE_BLOCK_DEVICE} $TMP_BUILD_DIR/mnt
 sudo mv -t $TMP_BUILD_DIR/mnt ${TMP_BUILD_DIR}/built/*
+# 挂载proc,dev,sys到${TMP_BUILD_DIR} 下面
 mount_proc_dev_sys
+# 执行元素目录下的finalise.d目录下的文件
 run_d_in_target finalise
+# 资源清理
 finalise_base
 
 for X in ${!IMAGE_TYPES[@]} ; do
   if [[ " tar aci " =~ "${IMAGE_TYPES[$X]}" ]]; then
     if [ "${IMAGE_TYPES[$X]}" = "aci" ]; then
+      # tar -C 指定切换的目录，-cf创建文件， --exclude 排除目录， --transform 使用 sed执行后面的表达式进行文件名变换
       sudo tar -C ${TMP_BUILD_DIR}/mnt -cf $IMAGE_NAME.aci --exclude ./sys \
                --exclude ./proc --xattrs --xattrs-include=\* \
                --transform 's,^.,rootfs,S' .
@@ -495,9 +507,12 @@ for X in ${!IMAGE_TYPES[@]} ; do
       sudo tar -C ${TMP_BUILD_DIR}/mnt -cf $IMAGE_NAME.tar --exclude ./sys \
                --exclude ./proc --xattrs --xattrs-include=\* .
     fi
+    # 更改每个文件的所有者和/或所有组
     sudo chown $USER: $IMAGE_NAME.${IMAGE_TYPES[$X]}
+    # unset 删除变量或者函数
     unset IMAGE_TYPES[$X]
   elif [ "${IMAGE_TYPES[$X]}" == "docker" ]; then
+    # docker import - xx表示导入本地镜像
     sudo tar -C ${TMP_BUILD_DIR}/mnt -cf - --exclude ./sys \
              --exclude ./proc --xattrs --xattrs-include=\* . \
         | sudo docker import - $DOCKER_TARGET
@@ -507,14 +522,16 @@ done
 
 if [[ ! $IMAGE_ELEMENT =~ no-final-image ]]; then
   # Prep filesystem by discarding all unused space
+  # 回收文件系统中未使用的空间
   fstrim_image
 fi
 
 # Unmount and cleanup the /mnt and /build subdirectories, to save
 # space before converting the image to some other format.
+# 卸载挂载的目录，清理空间---unmount_image中已经调用过cleanup_build_dir，不知为什么外边又调用一次
 unmount_image
 cleanup_build_dir
-
+# 使用最终工具制作镜像
 if [[ (! $IMAGE_ELEMENT =~ no-final-image) && "$IS_RAMDISK" == "0" ]]; then
   has_raw_type=
   for IMAGE_TYPE in ${IMAGE_TYPES[@]} ; do
@@ -535,4 +552,5 @@ fi
 cleanup_image_dir
 
 # All done!
+# 触发退出信号
 trap EXIT
