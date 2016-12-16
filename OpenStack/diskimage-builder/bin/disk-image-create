@@ -348,7 +348,7 @@ if [[ -n "${GENTOO_PROFILE}" ]]; then
         export DIB_NO_TMPFS=1
     fi
 fi
-
+# 生成镜像创建的目录，输出目录，元素钩子目录
 mk_build_dir
 create_base
 # This variable needs to be propagated into the chroot

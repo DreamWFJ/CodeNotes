@@ -13,7 +13,21 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-# 该函数检测是否需要临时文件系统加速镜像创建，需要的话，则对可用内存进行判断，是否满足要求，不满足则直接使用硬盘存储
+
+
+# 默认的Linux发行版中的内核配置都会开启tmpfs，映射到了/dev/下的shm目录。可以通过df 命令查看结果.
+# /dev/shm/是linux下一个非常有用的目录，因为这个目录不在硬盘上，而是在内存里。因此在linux下，就不需要大费周折去建ramdisk，直接使用/dev/shm/就可达到很好的优化效果。
+# 默认系统就会加载/dev/shm ，它就是所谓的tmpfs，有人说跟ramdisk（虚拟磁盘），但不一样。象虚拟磁盘一样，tmpfs 可以使用您的 RAM，
+# 但它也可以使用您的交换分区来存储。而且传统的虚拟磁盘是个块设备，并需要一个 mkfs 之类的命令才能真正地使用它，tmpfs 是一个文件系统，而不是块设备；您只是安装它，它就可以使用了。
+
+# tmpfs有以下优势：
+# 1。动态文件系统的大小，/dev /shm/需要注意的一个是容量问题，在linux下，它默认最大为内存的一半大小，使用df -h命令可以看到。但它并不会真正的占用这块内存，
+# 如果/dev/shm/下没有任何文件，它占用的内存实际上就是0字节；如果它最大为1G，里头放有 100M文件，那剩余的900M仍然可为其它应用程序所使用，但它所占用的100M内存，
+# 是绝不会被系统回收重新划分的
+# 2。tmpfs 的另一个主要的好处是它闪电般的速度。因为典型的 tmpfs 文件系统会完全驻留在 RAM 中，读写几乎可以是瞬间的。
+# 3。tmpfs 数据在重新启动之后不会保留，因为虚拟内存本质上就是易失的。所以有必要做一些脚本做诸如加载，绑定的操作
+
+# 该函数检测是否需要虚拟磁盘文件系统加速镜像创建
 function tmpfs_check() {
   # ${1:-1}表示如果传递了1个参数，则返回该参数的值，否则返回1
   local echo_message=${1:-1}
@@ -41,9 +55,9 @@ function mk_build_dir () {
   # 注意：下面的die函数是自己写的
   [ $? -eq 0 ] || die "Failed to create tmp directory"
   export TMP_BUILD_DIR
-  # 检查内存信息，看是否够使用
+  # 检查内存信息，看是否够使用，以确定是否需要使用tmpfs
   if tmpfs_check ; then
-    # 挂载文件系统类型为tmpfs 的设备tmpfs到指定的目录
+    # 挂载文件系统类型为tmpfs 的设备tmpfs到指定的目录，这样就可以直接通过写文件实现数据写入内存，速度快
     sudo mount -t tmpfs tmpfs $TMP_BUILD_DIR
     sudo mount -t tmpfs tmpfs $TMP_IMAGE_DIR
     # 更改文件的所属用户和分组
@@ -88,6 +102,7 @@ function save_image () {
     finish_image $1
 }
 
+# 注意，不同元素下的目录下的执行脚本，名字不能有重复的，假如不同的元素可能都有extra-data.d目录，则要求脚本名不一样，不然没法执行
 function copy_hooks_not_overwrite () {
     # 获取文件名
     _DIR=$(basename $1)
@@ -106,6 +121,7 @@ function copy_hooks_not_overwrite () {
     done
 }
 
+# 遍历收集到的元素，将元素目录文件统一拷贝到镜像建造路径下的钩子目录中
 function generate_hooks () {
   # 首先创建钩子目录
   mkdir -p $TMP_HOOKS_PATH
@@ -201,6 +217,7 @@ function cleanup_image_dir () {
 # Run a directory of hooks outside the target (that is, no chrooting).
 # $1是需要运行的钩子名称
 # $2是运行的结果存放点
+# 该函数功能是：执行某个目录下的脚本
 function run_d() {
     check_element
     check_break before-$1 ${break_cmd:-bash}
@@ -273,6 +290,7 @@ function detach_loopback() {
 
 # 搜集默认元素和客户定制的元素信息
 function arg_to_elements() {
+  # for循环中省略in则是对位置参数$@进行循环
   for arg do IMAGE_ELEMENT="$IMAGE_ELEMENT $arg" ; done
   # 是否跳过base元素
   if [ "$SKIP_BASE" != "1" ]; then
@@ -295,7 +313,7 @@ function create_base () {
     mkdir $TMP_BUILD_DIR/mnt
     export TMP_MOUNT_PATH=$TMP_BUILD_DIR/mnt
     # Copy data in to the root.
-    # 部署根元素
+    # 执行建造目录下钩子目录中的root.d下的脚本
     TARGET_ROOT=$TMP_MOUNT_PATH run_d root
     if [ -z "$(ls $TMP_MOUNT_PATH | grep -v '^lost+found\|tmp$')" ] ; then
         # No root element copied in. Note the test above allows

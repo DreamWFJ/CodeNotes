@@ -12,7 +12,11 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
+'''
+文件说明：该python脚本根据传入的元素去寻找依赖元素，最终返回依赖元素结合
+    分别从依赖元素下的 element-provides 和 element-deps 获取其它依赖元素
+    需要注意的是，用户若自定义依赖元素，则总的依赖目录是以冒号分隔的字符串 -- 但是代码中只处理一层循环，若有客户自定义，则默认的元素路径则废弃
+'''
 from __future__ import print_function
 import argparse
 import collections
@@ -25,6 +29,7 @@ import diskimage_builder.logging_config
 logger = logging.getLogger(__name__)
 
 # 从环境变量中获取元素的目录--这是传递共享参数的一种方式
+# 在common-defaults中设置了默认值为 elements目录
 def get_elements_dir():
     if not os.environ.get('ELEMENTS_PATH'):
         raise Exception("$ELEMENTS_PATH must be set.")
@@ -34,14 +39,17 @@ def get_elements_dir():
 def _get_set(element, fname, elements_dir=None):
     if elements_dir is None:
         elements_dir = get_elements_dir()
-
+    # 如果客户自己定义了元素路径，则与默认元素路径以冒号分隔
     for path in elements_dir.split(':'):
         # 这里将path, element, fname拼接为一个路径
         element_deps_path = (os.path.join(path, element, fname))
         try:
             with open(element_deps_path) as element_deps:
+                # 这里是否有问题？第一次循环就返回了，后面的怎么办？--------------------------------- bug ？？
+                # 个人认为：用户要自己指定元素路径，则的包含所有的元素（包括系统定义的）--- 这里可否优化：只指定用户定义的，需要的系统依赖，同样到系统目录中寻找
                 return set([line.strip() for line in element_deps])
         except IOError as e:
+            # errno.errorcode.keys() 列举errno错误代码，此处errno.ENOENT 为 2 表示没有该文件或目录
             if os.path.exists(os.path.join(path, element)) and e.errno == 2:
                 return set()
             if e.errno == 2:
@@ -91,19 +99,21 @@ def expand_dependencies(user_elements, elements_dir=None):
     :return: a set containing user_elements and all dependent elements
              including any transitive dependencies.
     """
+    # 将传递的数组转换为集合 -- 假如为['base', 'centos7', 'vm']
     final_elements = set(user_elements)
     check_queue = collections.deque(user_elements)
     provided = set()
     provided_by = collections.defaultdict(list)
-
+    # 这里将依赖元素和元素提供者找出来
     while check_queue:
         # bug #1303911 - run through the provided elements first to avoid
         # adding unwanted dependencies and looking for virtual elements
+        # 从队列开头取出一个元素
         element = check_queue.popleft()
         # 避免获取重复的元素
         if element in provided:
             continue
-        # 单独将依赖和提供者的集合获取
+        # 单独将依赖（element-deps）和提供者（element-provides）的集合获取
         element_deps = dependencies(element, elements_dir)
         element_provides = provides(element, elements_dir)
         # save which elements provide another element for potential
@@ -112,6 +122,7 @@ def expand_dependencies(user_elements, elements_dir=None):
         for provide in element_provides:
             provided_by[provide].append(element)
         provided.update(element_provides)
+        # 过滤掉已经存在的元素
         check_queue.extend(element_deps - (final_elements | provided))
         final_elements.update(element_deps)
 
@@ -136,6 +147,7 @@ def main(argv):
     diskimage_builder.logging_config.setup()
 
     parser = argparse.ArgumentParser()
+    # 使用nargs='+' 或者 '*' 表示传入待解析的参数必须为一个列表，'*' 表示至少0个，'+'表示至少1个
     parser.add_argument('elements', nargs='+',
                         help='display dependencies of the given elements')
     parser.add_argument('--expand-dependencies', '-d', action='store_true',
@@ -148,6 +160,6 @@ def main(argv):
     if args.expand_dependencies:
         logger.warning("expand-dependencies flag is deprecated,  "
                        "and is now on by default.", file=sys.stderr)
-
+    # 将结果转换为字符串输出
     print(' '.join(expand_dependencies(args.elements)))
     return 0
