@@ -39,6 +39,8 @@ function fstrim_image () {
     sync
 
     # Discard all unused bytes
+    # fstrim - 回收一个已挂载的文件系统上所有未使用的块
+    # 格式：fstrim  [-a]  [-o offset]  [-l length]  [-m minimum-free-extent] [-v] mountpoint
     sudo fstrim "${TMP_BUILD_DIR}/mnt"
 }
 
@@ -49,12 +51,16 @@ function trap_cleanup() {
 }
 
 function cleanup () {
+    # 卸载已挂载的设备
     unmount_image
+    # 清理已经建立的临时目录，用于创建镜像过程中产生的数据存放位置
     cleanup_build_dir
+    # 清理已经建立的镜像
     cleanup_image_dir
 }
 
 # Helper function to run a command inside the chroot
+# 在指定的根目录下执行，限制其执行权限
 function run_in_target () {
     cmd="$@"
     # -E to preserve http_proxy
@@ -65,26 +71,39 @@ function run_in_target () {
     # Bug: #1330290
     # Force the inclusion of a typical set of dirs in PATH, this is needed for guest
     # distros that have path elements not in the host PATH.
+    # chroot 改变程式执行时所参考的根目录位置
+    # env -u 表示取消所有的环境变量设置，后面重新跟新的环境变量
     sudo -E chroot $TMP_MOUNT_PATH env -u TMPDIR PATH="\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" sh -c "$cmd"
+    # 重新设置根目录
     export HOME=$ORIG_HOME
 }
 
 # Helper function to run a directory of scripts inside the chroot
 function run_d_in_target () {
+    # 检查钩子目录（添加的元素对应的目录），将钩子目录下的文件拷贝到镜像建造目录中
     check_element
     # If we can find a directory of hooks to run in the target filesystem, bind
     # mount it into the target and then execute run-parts in a chroot
+    # 如果某个钩子目录存在，
     if [ -d ${TMP_HOOKS_PATH}/$1.d ] ; then
+      # 创建一个临时目录
       sudo mkdir $TMP_MOUNT_PATH/tmp/in_target.d
+      # 将钩子目录全部挂载过来
       sudo mount --bind ${TMP_HOOKS_PATH} $TMP_MOUNT_PATH/tmp/in_target.d
+      # mount -o 为自定义选项，remount表示重新挂载，ro以只读方式挂载，bind表示将一个目录挂载到另外一个目录
       sudo mount -o remount,ro,bind ${TMP_HOOKS_PATH} $TMP_MOUNT_PATH/tmp/in_target.d
+      # 设置断点
       check_break before-$1 run_in_target bash
+      # $break_outside_target这个参数不知从哪里来 -----------------------------------------------------？？
       [ -z "$break_outside_target" ] && in_target_arg="run_in_target" || in_target_arg=
       trap "check_break after-error $in_target_arg ${break_cmd:-bash}" ERR
+      # 设置一个新的根目录环境去执行钩子目录中的文件
       run_in_target dib-run-parts /tmp/in_target.d/$1.d
       trap - ERR
       check_break after-$1 run_in_target bash
+      # 强制卸载前面挂载的目录
       sudo umount -f $TMP_MOUNT_PATH/tmp/in_target.d
+      # rmdir 从一个目录中删除一个或多个子目录项，删除某目录时也必须具有对父目录的写权限
       if ! timeout 5  sh -c " while ! sudo rmdir $TMP_MOUNT_PATH/tmp/in_target.d; do sleep 1; done"; then
           echo "ERROR: unable to cleanly remove $TMP_MOUNT_PATH/tmp/in_target.d"
           exit 1
@@ -95,6 +114,29 @@ function run_d_in_target () {
 function finalise_base () {
     TARGET_ROOT=$TMP_MOUNT_PATH run_d cleanup
     # If the file has been set immutable, we probably want to keep it
+    # lsattr 查看文件的特殊权限
+    # chattr 设置文件的特殊权限
+        #chattr  [+-=]  [ASacdistu]  [文件或目录名称]
+        #参数说明：
+        #+-=：分别是"+"(增加)、"-"(减少)、"="(设定)属性
+        #A：当设定了属性A，这个文件（或目录）的存取时间atime(access)将不可被修改，可避免诸如手提电脑容易产生磁盘I/O错误的情况；
+        #S：这个功能有点类似sync，是将数据同步写入磁盘中，可以有效避免数据流失；
+        #a：设定a后，这个文件将只能增加数据而不能删除，只有root才能设定这个属性；
+        #c：设定这个属性后，将会自动将此文件压缩，在读取时自动解压缩。但是在存储的时候，会现进行压缩在存储（对于大文件很有用）；
+        #d：当dump（备份）程序执行时，设定d属性将可使该文件（或目录）具有dump功效；
+        #i：这个参数可以让一个文件”不能被删除、更名、设定链接，也无法写入数据，对于系统安全有很大的助益
+        #j：当使用ext3文件系统格式时，设定j属性将使文件在写入时先记录在日志中，但是当filesystem设定参数为data=journalled时，由于已经设定了日志，所以这个属性无效
+        #s：当文件设定了s参数时，它会被完全移出这个硬盘空间
+        #u：与s相反，当使用u配置文件时，数据内容其实还可以存在于磁盘中，可以用来取消删除
+        #
+        #lsattr   [-aR]
+        #参数说明：
+        #-a   ：将隐藏文件的属性也显示出来
+        #-R   ：连同子目录的数据一并显示出来
+        #
+        #更改下列文件权限，使任何人没有更改账户权限：
+        #chattr +i /etc/passwd chattr +i /etc/shadow chattr +i /etc/group chattr +i /etc/gshadow
+    # 查看该文件是否具有不能改变的权限，是则只能使用该文件，否则将我们的ORIG文件覆盖到这里
     if lsattr $TMP_MOUNT_PATH/etc/resolv.conf | grep '^....i' >/dev/null ; then
         # We're keeping the contents of resolv.conf set in the elements,
         # so remove the old saved file
@@ -108,15 +150,18 @@ function finalise_base () {
         fi
     fi
     # Cleanup /tmp in the guest, so there is less cruft left there
+    # 若存在tmp目录，这卸载设备
     if [ -d "$TMP_MOUNT_PATH/tmp" ]; then
         unmount_dir $TMP_MOUNT_PATH/tmp
     fi
+    # 清理tmp下的文件
     find $TMP_MOUNT_PATH/tmp -maxdepth 1 -mindepth 1 | xargs sudo rm -rf --one-file-system
 }
 
 function compress_and_save_image () {
     # Recreate our image to throw away unnecessary data
     test $IMAGE_TYPE != qcow2 && COMPRESS_IMAGE=""
+    # 如果qumu镜像工具参数不为空，则添加额外选项
     if [ -n "$QEMU_IMG_OPTIONS" ]; then
         EXTRA_OPTIONS="-o $QEMU_IMG_OPTIONS"
     else
@@ -125,6 +170,7 @@ function compress_and_save_image () {
     if [ "$IMAGE_TYPE" = "raw" ]; then
         mv $TMP_IMAGE_PATH $1-new
     elif [ "$IMAGE_TYPE" == "vhd" ]; then
+        # 这个地方需要对vhd-util工具进行了解 -----------------------------------!!
         cp $TMP_IMAGE_PATH $1-intermediate
         vhd-util convert -s 0 -t 1 -i $1-intermediate -o $1-intermediate
         vhd-util convert -s 1 -t 2 -i $1-intermediate -o $1-new
@@ -132,17 +178,21 @@ function compress_and_save_image () {
         rm $1-intermediate.bak
         OUT_IMAGE_PATH=$1-new
     else
+        # 这个地方需要对qemu-img工具进行了解 -----------------------------------!!
         echo "Converting image using qemu-img convert"
         qemu-img convert ${COMPRESS_IMAGE:+-c} -f raw -O $IMAGE_TYPE $EXTRA_OPTIONS $TMP_IMAGE_PATH $1-new
     fi
 
     OUT_IMAGE_PATH=$1-new
+    # 保存镜像
     finish_image $1
 }
 
+# 处理额外的包安装
 function do_extra_package_install () {
   # Install any packages that were requested with the -p command line option
   if [ "$INSTALL_PACKAGES" != "" ]; then
+    # 在chroot的情况下，新环境中执行包安装
     run_in_target install-packages ${INSTALL_PACKAGES[@]}
   fi
 }
@@ -157,6 +207,7 @@ function select_boot_kernel_initrd () {
     TARGET_ROOT=$1
     BOOTDIR=$TARGET_ROOT/boot
     if [ -n "${DIB_BAREMETAL_KERNEL_PATTERN:-}" -a -n "${DIB_BAREMETAL_INITRD_PATTERN:-}" ]; then
+        # ls -lrv 其中r表示反序，v表示自然排序
         KERNEL=$(basename $(eval ls -1rv "$BOOTDIR/${DIB_BAREMETAL_KERNEL_PATTERN}" | head -1))
         RAMDISK=$(basename $(eval ls -1rv "$BOOTDIR/${DIB_BAREMETAL_INITRD_PATTERN}" | head -1))
     elif [ -f $TARGET_ROOT/etc/redhat-release ]; then
