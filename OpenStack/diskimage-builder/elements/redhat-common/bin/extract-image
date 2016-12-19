@@ -17,7 +17,9 @@ CACHED_IMAGE=$4
 CACHED_TAR=$DIB_IMAGE_CACHE/$BASE_IMAGE_TAR
 DIB_LOCAL_IMAGE=${DIB_LOCAL_IMAGE:-""}
 TAR_LOCK=$CACHED_TAR.lock
-
+# 提取镜像
+# 首先判断是否需要缓存和存在缓存标签文件，有缓存直接从缓存中提取
+# 没有缓存文件，则先通过curl下载，然后qemu-img工具转换为raw,再从分区表中提取需要的信息打包压缩，产生满足客户要求的镜像
 function extract_image() {
     if [ -n "$DIB_OFFLINE" -a -f "$CACHED_TAR" ] ; then
         echo "Not checking freshness of cached $CACHED_TAR."
@@ -28,6 +30,7 @@ function extract_image() {
             # There seems to be some bad Fedora mirrors returning http 404's for the cloud image.
             # If the image fails to download due to a 404 we retry once.
             set +e
+            # 配置curl参数，然后下载镜像
             $TMP_HOOKS_PATH/bin/cache-url $IMAGE_LOCATION $CACHED_IMAGE
             RV=$?
             set -e
@@ -38,7 +41,7 @@ function extract_image() {
                 exit 1
             fi
         fi
-
+        # 先判断缓存标签，然后看看是否最新(最新-nt， 旧-ot, 与同一个设备相连-ef)
         if [ ! -f $CACHED_TAR -o \
             $CACHED_IMAGE -nt $CACHED_TAR ] ; then
             echo "Repacking base image as tarball."
@@ -53,13 +56,15 @@ function extract_image() {
             if [ "${CACHED_IMAGE: -3}" == ".xz" ] ; then
                 QCOW2_FILE=$(mktemp --tmpdir=$WORKING XXXXXX.qcow2)
                 # This leaves the old image in place so cache-url wont get it again
+                # 压缩和解压缩.xz文件
                 unxz --stdout $CACHED_IMAGE > $QCOW2_FILE
                 CACHED_IMAGE=$QCOW2_FILE
             fi
 
             qemu-img convert -f qcow2 -O raw $CACHED_IMAGE $RAW_FILE
-
+            # kpartx挂载带有分区的映像文件，losetup只能挂载不带分区的文件系统
             ROOT_PARTITION=p$(sudo kpartx -l $RAW_FILE | awk "/loop[0-9]+p/"|wc -l)
+            # udevadm 后接一个命令和命令指定选项。它控制了udev运行的行为，处理内核事件，控制事件队列，并且提供简单的调试机制
             sudo udevadm settle
 
             # kpartx fails if no /dev/loop* exists, "losetup -f" prints first unused
@@ -81,6 +86,7 @@ function extract_image() {
             EACTION="sudo kpartx -d $RAW_FILE ; $EACTION"
             trap "$EACTION" EXIT
             mkdir $WORKING/mnt
+            # blkid主要用来对系统的块设备（包括交换分区）所使用的文件系统类型、LABEL、UUID等信息进行查询
             if [ "xfs" = "$(sudo blkid -o value -s TYPE /dev/mapper/$ROOT_LOOPDEV)" ]; then
                 # mount xfs with nouuid, just in case that uuid is already mounted
                 MOUNTOPTS="-o nouuid"
@@ -117,6 +123,7 @@ function extract_image() {
 (
     echo "Getting $TAR_LOCK: $(date)"
     # Wait up to 20 minutes for another process to download
+    #  flock管理shell脚本中的锁，-w表示等待时间，9表示文件描述符
     if ! flock -w 1200 9 ; then
         echo "Did not get $TAR_LOCK: $(date)"
         exit 1

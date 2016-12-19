@@ -9,7 +9,8 @@ set -o pipefail
 # Abort early if dib-run-parts is not found to prevent a meaningless
 # error message from the subsequent install command
 DIB_RUN_PARTS=$(which dib-run-parts)
-
+# install命令安装或升级软件或备份数据，它的使用权限是所有用户
+# -m 指定模式， -o指定用户， -g指定组， -D src dst 将源目录复制到目标目录
 exec sudo install -m 0755 -o root -g root -D \
     $DIB_RUN_PARTS \
     $TARGET_ROOT/usr/local/bin/dib-run-parts

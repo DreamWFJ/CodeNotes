@@ -350,6 +350,7 @@ if [[ -n "${GENTOO_PROFILE}" ]]; then
 fi
 # 生成镜像创建的目录，输出目录，元素钩子目录
 mk_build_dir
+# 第一次检查元素钩子，和产生钩子，最后运行root.d下的脚本。 重置dns，挂载虚拟设备
 create_base
 # This variable needs to be propagated into the chroot
 mkdir -p $TMP_HOOKS_PATH/environment.d

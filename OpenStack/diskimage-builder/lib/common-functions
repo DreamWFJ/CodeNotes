@@ -66,10 +66,7 @@ function mk_build_dir () {
   # 设置捕获到退出信号时，进行清理
   trap trap_cleanup EXIT
   echo Building in $TMP_BUILD_DIR
-  # 建立3个临时环境变量，生成的镜像路径，钩子路径
-  export TMP_IMAGE_PATH=$TMP_IMAGE_DIR/image.raw
-  export OUT_IMAGE_PATH=$TMP_IMAGE_PATH
-  export TMP_HOOKS_PATH=$TMP_BUILD_DIR/hooks
+  # 建立3个临时环境变量，生成create_base
 }
 
 # 该函数功能：将旧的镜像以及校验信息归档，将新产生的镜像和校验文件命名为指定名称

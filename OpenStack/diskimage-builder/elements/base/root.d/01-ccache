@@ -14,6 +14,6 @@ grep " $TMP_MOUNT_PATH/tmp/ccache" /proc/mounts && exit
 
 DIB_CCACHE_DIR=${DIB_CCACHE_DIR:-$DIB_IMAGE_CACHE/ccache}
 mkdir -p $DIB_CCACHE_DIR
-
+# 这样做，即使设备卸载了，缓存数据依然存在
 sudo mkdir -p $TMP_MOUNT_PATH/tmp/ccache
 sudo mount --bind $DIB_CCACHE_DIR $TMP_MOUNT_PATH/tmp/ccache
