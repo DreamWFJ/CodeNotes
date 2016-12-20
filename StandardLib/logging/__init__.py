@@ -35,6 +35,8 @@ __all__ = ['BASIC_FORMAT', 'BufferingFormatter', 'CRITICAL', 'DEBUG', 'ERROR',
            'info', 'log', 'makeLogRecord', 'setLoggerClass', 'warn', 'warning']
 
 try:
+    # codecs是一个自然语言编码转换库
+    # python内部编码转换过程为 原有编码->内部编码->目的编码
     import codecs
 except ImportError:
     codecs = None
@@ -828,6 +830,7 @@ class StreamHandler(Handler):
         Initialize the handler.
 
         If stream is not specified, sys.stderr is used.
+        若没有指定stream，则使用标准错误
         """
         Handler.__init__(self)
         if stream is None:
@@ -1535,6 +1538,7 @@ def basicConfig(**kwargs):
     _acquireLock()
     try:
         if len(root.handlers) == 0:
+            # 从这里看出来，当有filename和stream的时候，stream不生效
             filename = kwargs.get("filename")
             if filename:
                 mode = kwargs.get("filemode", 'a')
