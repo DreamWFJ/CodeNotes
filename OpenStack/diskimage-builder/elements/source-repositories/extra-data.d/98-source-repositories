@@ -20,6 +20,7 @@ function make_new_cache(){
     # If the old cache name exists, move it to the new cache name
     if [ -e "$OLD_CACHE_BASE" ] ; then
         if [ ! -e "$CACHE_BASE" ] ; then
+            # mv -n 表示不重新已经存在的文件
             mv -n $OLD_CACHE_BASE $CACHE_BASE
         else
             echo "Not replacing new cache location with old cache"
@@ -208,6 +209,7 @@ function get_repos_for_element(){
 
                 # A REPOREF of '.' will select the entire contents of the tarball,
                 # while '*' will select only the contents of its subdirectories.
+                # rsync是一个实现远程同步功能的软件
                 sudo rsync -a --remove-source-files $tmpdir/$REPOREF/. $REPO_DEST
 
                 rm -rf $tmpdir

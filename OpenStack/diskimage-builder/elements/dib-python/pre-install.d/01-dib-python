@@ -11,5 +11,5 @@ if [ -z "$python_path" ]; then
     echo "Could not find python2 or python3 executable."
     exit 1
 fi
-
+# 创建符号链接
 ln -sf $python_path /usr/local/bin/dib-python

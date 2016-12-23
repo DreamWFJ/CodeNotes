@@ -8,5 +8,6 @@ set -o pipefail
 
 if [[ $DISTRO_NAME == "fedora" && $DIB_RELEASE -eq 22 ]]; then
     # we need dnf mark command from dnf 1.1.1, which is pretty recent
+    # dnf 是一款包管理软件，这里是更新dnf软件
     dnf --refresh update -y dnf
 fi

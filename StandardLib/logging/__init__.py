@@ -277,7 +277,9 @@ class LogRecord(object):
         self.levelno = level
         self.pathname = pathname
         try:
+            # basename获取路径文件的文件名称，还有dirname获取目录名称，normcase格式化路径
             self.filename = os.path.basename(pathname)
+            # splitext将路径文件的后缀分隔开，比如/home/test.txt结果为('/home/test', '.txt')
             self.module = os.path.splitext(self.filename)[0]
         except (TypeError, ValueError, AttributeError):
             self.filename = pathname

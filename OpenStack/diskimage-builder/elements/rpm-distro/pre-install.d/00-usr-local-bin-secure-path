@@ -5,6 +5,7 @@ if [ ${DIB_DEBUG_TRACE:-0} -gt 0 ]; then
 fi
 set -eu
 set -o pipefail
-
+# sed -i 表示在文件上编辑，-e表示执行脚本
 sed -i -e "/secure_path/ s@\([\'\"]\?\)\$@:/usr/local/bin/\1@" /etc/sudoers
+# visudo编辑sudoers文件，而/etc/sudoers是sudo为非根用户授权的配置文件
 visudo -c
