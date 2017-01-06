@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import print_function
 
 from abc import ABCMeta, abstractmethod
@@ -54,7 +55,7 @@ class BaseScheduler(six.with_metaclass(ABCMeta)):
 
     .. seealso:: :ref:`scheduler-config`
     """
-
+    # 这里加载指定目录下的插件，以便于后面使用
     _trigger_plugins = dict((ep.name, ep) for ep in iter_entry_points('apscheduler.triggers'))
     _trigger_classes = {}
     _executor_plugins = dict((ep.name, ep) for ep in iter_entry_points('apscheduler.executors'))
@@ -68,6 +69,7 @@ class BaseScheduler(six.with_metaclass(ABCMeta)):
 
     def __init__(self, gconfig={}, **options):
         super(BaseScheduler, self).__init__()
+        # 创建各个对象锁
         self._executors = {}
         self._executors_lock = self._create_lock()
         self._jobstores = {}
@@ -75,7 +77,9 @@ class BaseScheduler(six.with_metaclass(ABCMeta)):
         self._listeners = []
         self._listeners_lock = self._create_lock()
         self._pending_jobs = []
+        # 设置调度器当前状态为停止
         self.state = STATE_STOPPED
+        # 配置调取器的默认参数
         self.configure(gconfig, **options)
 
     def configure(self, gconfig={}, prefix='apscheduler.', **options):
@@ -242,6 +246,7 @@ class BaseScheduler(six.with_metaclass(ABCMeta)):
             if isinstance(executor, BaseExecutor):
                 self._executors[alias] = executor
             elif isinstance(executor, six.string_types):
+                # 选取执行者
                 self._executors[alias] = executor = self._create_plugin_instance(
                     'executor', executor, executor_opts)
             else:

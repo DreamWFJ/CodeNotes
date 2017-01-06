@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from collections import Iterable, Mapping
 from uuid import uuid4
 
