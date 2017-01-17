@@ -67,13 +67,11 @@ if __debug__:
                 # Issue #4188: calling current_thread() can incur an infinite
                 # recursion if it has to create a DummyThread on the fly.
                 ident = _get_ident()
-                print "_active: ",_active
                 try:
                     name = _active[ident].name
                 except KeyError:
                     name = "<OS thread %d>" % ident
                 format = "%s: %s\n" % (name, format)
-                print "format: ", format
                 _sys.stderr.write(format)
 
 else:
@@ -168,8 +166,6 @@ class _RLock(_Verbose):
 
         """
         me = _get_ident()
-        print "me: ",me
-        print "__debug__: ",__debug__
         if self.__owner == me:
             self.__count = self.__count + 1
             if __debug__:
@@ -489,6 +485,7 @@ class _Semaphore(_Verbose):
         to become larger than zero again, wake up that thread.
 
         """
+        print self.__value
         with self.__cond:
             self.__value = self.__value + 1
             if __debug__:
