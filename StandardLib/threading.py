@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Thread module emulating a subset of Java's threading model."""
 
 import sys as _sys
@@ -249,6 +250,8 @@ def Condition(*args, **kwargs):
     is created and used as the underlying lock.
 
     """
+    # args or kwargs must be a Lock or RLock object
+    # return example: <Condition(<_RLock owner=None count=0>, 0)>
     return _Condition(*args, **kwargs)
 
 class _Condition(_Verbose):
@@ -1156,6 +1159,7 @@ def currentThread():
     module, a dummy thread object with limited functionality is returned.
 
     """
+    # 返回当前线程对象，格式如： <_MainThread(MainThread, started 56880)>
     try:
         return _active[_get_ident()]
     except KeyError:
@@ -1171,6 +1175,9 @@ def activeCount():
     enumerate().
 
     """
+    # _active struct == {48444: <_MainThread(MainThread, started 48444)>}
+    print _active
+    print _limbo
     with _active_limbo_lock:
         return len(_active) + len(_limbo)
 
