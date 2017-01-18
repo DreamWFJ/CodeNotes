@@ -216,7 +216,7 @@ class _RLock(_Verbose):
         self.release()
 
     # Internal methods used by condition variables
-
+    # 下面这2个方法，_acquire_restore是恢复到指定状态，_release_save是返回当前状态值并将当前状态清零
     def _acquire_restore(self, count_owner):
         count, owner = count_owner
         self.__block.acquire()
@@ -357,6 +357,7 @@ class _Condition(_Verbose):
                     remaining = endtime - _time()
                     if remaining <= 0:
                         break
+                    # 微小延时设置
                     delay = min(delay * 2, remaining, .05)
                     _sleep(delay)
                 if not gotit:

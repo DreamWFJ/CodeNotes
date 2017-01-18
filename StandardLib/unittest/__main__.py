@@ -1,6 +1,7 @@
 """Main entry point"""
 
 import sys
+print sys.argv
 if sys.argv[0].endswith("__main__.py"):
     sys.argv[0] = "python -m unittest"
 
