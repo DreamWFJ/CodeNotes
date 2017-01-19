@@ -27,6 +27,7 @@ class _InterruptHandler(object):
 
     def __call__(self, signum, frame):
         installed_handler = signal.getsignal(signal.SIGINT)
+        print "wfj-- installed_handler: ",installed_handler
         if installed_handler is not self:
             # if we aren't the installed handler, then delegate immediately
             # to the default handler

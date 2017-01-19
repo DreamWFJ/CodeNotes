@@ -37,6 +37,9 @@ class TestSequenceFunctions(unittest.TestCase):
         for element in random.sample(self.seq, 5):
             self.assertTrue(element in self.seq)
 
+    # def test_abc(self):
+    #     self.assertTrue(0)
+
 if __name__ == '__main__':
     unittest.main()
     # 可以使用下面的2行代替 unittest.main()

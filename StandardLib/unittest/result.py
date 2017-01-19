@@ -14,6 +14,8 @@ __unittest = True
 def failfast(method):
     @wraps(method)
     def inner(self, *args, **kw):
+        print "wfj-- method: ",method
+        print "wfj-- self: ", self
         if getattr(self, 'failfast', False):
             self.stop()
         return method(self, *args, **kw)
