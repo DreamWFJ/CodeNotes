@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Unittest main program"""
 
 import sys
@@ -73,12 +74,19 @@ class TestProgram(object):
                     testRunner=None, testLoader=loader.defaultTestLoader,
                     exit=True, verbosity=1, failfast=None, catchbreak=None,
                     buffer=None):
+        print "module: ",module
+        print "defaultTest: ",defaultTest
+        print "argv: ",argv
+        print "testRunner: ",testRunner
+        print "testLoader: ",testLoader
         if isinstance(module, basestring):
             self.module = __import__(module)
             for part in module.split('.')[1:]:
+                print "part: ",part
                 self.module = getattr(self.module, part)
         else:
             self.module = module
+        print "self.module: ", self.module
         if argv is None:
             argv = sys.argv
 
@@ -91,6 +99,7 @@ class TestProgram(object):
         self.testRunner = testRunner
         self.testLoader = testLoader
         self.progName = os.path.basename(argv[0])
+        print "self.progName: ",self.progName
         self.parseArgs(argv)
         self.runTests()
 
@@ -109,6 +118,7 @@ class TestProgram(object):
         sys.exit(2)
 
     def parseArgs(self, argv):
+        print "into parseArgs, argv: ", argv
         if len(argv) > 1 and argv[1].lower() == 'discover':
             self._do_discovery(argv[2:])
             return
@@ -117,6 +127,7 @@ class TestProgram(object):
         long_opts = ['help', 'verbose', 'quiet', 'failfast', 'catch', 'buffer']
         try:
             options, args = getopt.getopt(argv[1:], 'hHvqfcb', long_opts)
+            print "options, args: ",options, args
             for opt, value in options:
                 if opt in ('-h','-H','--help'):
                     self.usageExit()
@@ -152,10 +163,13 @@ class TestProgram(object):
 
     def createTests(self):
         if self.testNames is None:
+            print "into createTests, self.testLoader.loadTestsFromModule"
             self.test = self.testLoader.loadTestsFromModule(self.module)
         else:
+            print "into createTests, self.testLoader.loadTestsFromNames"
             self.test = self.testLoader.loadTestsFromNames(self.testNames,
                                                            self.module)
+        print "self.test: ",self.test
 
     def _do_discovery(self, argv, Loader=None):
         if Loader is None:
@@ -214,12 +228,16 @@ class TestProgram(object):
         self.test = loader.discover(start_dir, pattern, top_level_dir)
 
     def runTests(self):
+        print "------------- into runTests"
         if self.catchbreak:
+            # 安装信号捕获，当按下ctrl+c则停止测试，并显示测试结果
             installHandler()
         if self.testRunner is None:
             self.testRunner = runner.TextTestRunner
+            print "into runTests self.testRunner: ", self.testRunner
         if isinstance(self.testRunner, (type, types.ClassType)):
             try:
+                # 实例化
                 testRunner = self.testRunner(verbosity=self.verbosity,
                                              failfast=self.failfast,
                                              buffer=self.buffer)
@@ -228,6 +246,7 @@ class TestProgram(object):
                 testRunner = self.testRunner()
         else:
             # it is assumed to be a TestRunner instance
+            # 默认为一个实例
             testRunner = self.testRunner
         self.result = testRunner.run(self.test)
         if self.exit:

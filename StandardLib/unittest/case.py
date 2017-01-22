@@ -180,6 +180,7 @@ class TestCase(object):
            method when executed. Raises a ValueError if the instance does
            not have a method with the specified name.
         """
+        print "- 1 methodName: ", methodName, self.__class__
         self._testMethodName = methodName
         self._resultForDoCleanups = None
         try:
@@ -390,6 +391,7 @@ class TestCase(object):
         return ok
 
     def __call__(self, *args, **kwds):
+        print "44 -- into TestCase __call__ ", args, kwds
         return self.run(*args, **kwds)
 
     def debug(self):

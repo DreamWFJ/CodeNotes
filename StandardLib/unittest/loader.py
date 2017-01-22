@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Loading unittests."""
 
 import os
@@ -47,25 +48,35 @@ class TestLoader(object):
 
     def loadTestsFromTestCase(self, testCaseClass):
         """Return a suite of all tests cases contained in testCaseClass"""
+        print "testCaseClass pre class: ", testCaseClass.__class__
+        print "testCaseClass: ", testCaseClass
         if issubclass(testCaseClass, suite.TestSuite):
             raise TypeError("Test cases should not be derived from TestSuite." \
                                 " Maybe you meant to derive from TestCase?")
         testCaseNames = self.getTestCaseNames(testCaseClass)
+        print "testCaseNames: ", testCaseNames
         if not testCaseNames and hasattr(testCaseClass, 'runTest'):
             testCaseNames = ['runTest']
+        # 注意这里，根据测试函数名称，实例化每个测试用例
         loaded_suite = self.suiteClass(map(testCaseClass, testCaseNames))
+        print "loaded_suite: ",loaded_suite
         return loaded_suite
 
     def loadTestsFromModule(self, module, use_load_tests=True):
         """Return a suite of all tests cases contained in the given module"""
+        print "module, use_load_tests: ", module, use_load_tests
+        print "dir(module): ", dir(module)
         tests = []
         for name in dir(module):
             obj = getattr(module, name)
             if isinstance(obj, type) and issubclass(obj, case.TestCase):
+                print "obj : ", obj
                 tests.append(self.loadTestsFromTestCase(obj))
-
+        print "- 2 into loadTestsFromModule tests: ", tests
         load_tests = getattr(module, 'load_tests', None)
+        print "into loadTestsFromModule load_tests: ", load_tests, module.__name__
         tests = self.suiteClass(tests)
+        print "- 2.1 into loadTestsFromModule tests: ", tests
         if use_load_tests and load_tests is not None:
             try:
                 return load_tests(self, tests, None)
@@ -133,11 +144,13 @@ class TestLoader(object):
     def getTestCaseNames(self, testCaseClass):
         """Return a sorted sequence of method names found within testCaseClass
         """
+        # print "into getTestCaseNames dir(testCaseClass): ",dir(testCaseClass)
         def isTestMethod(attrname, testCaseClass=testCaseClass,
                          prefix=self.testMethodPrefix):
             return attrname.startswith(prefix) and \
                 hasattr(getattr(testCaseClass, attrname), '__call__')
         testFnNames = filter(isTestMethod, dir(testCaseClass))
+        print "into getTestCaseNames testFnNames: ",testFnNames
         if self.sortTestMethodsUsing:
             testFnNames.sort(key=_CmpToKey(self.sortTestMethodsUsing))
         return testFnNames

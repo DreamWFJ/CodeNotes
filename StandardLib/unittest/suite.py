@@ -17,6 +17,7 @@ class BaseTestSuite(object):
     """A simple test suite that doesn't provide class or module shared fixtures.
     """
     def __init__(self, tests=()):
+        print "into BaseTestSuite init tests: ", tests
         self._tests = []
         self.addTests(tests)
 
@@ -61,12 +62,16 @@ class BaseTestSuite(object):
 
     def run(self, result):
         for test in self:
+            print "--------- test: ", test
+            print "--------- result: ", result
             if result.shouldStop:
                 break
             test(result)
         return result
 
     def __call__(self, *args, **kwds):
+        print "----------- in %s __call__"%self.__class__.__name__, args, kwds
+
         return self.run(*args, **kwds)
 
     def debug(self):
@@ -89,12 +94,14 @@ class TestSuite(BaseTestSuite):
         topLevel = False
         if getattr(result, '_testRunEntered', False) is False:
             result._testRunEntered = topLevel = True
-
+        print "00-- result: ",result
+        print "00-- self: ",list(self)
         for test in self:
             if result.shouldStop:
                 break
-
+            print "00-- into TestSuite test: ",test
             if _isnotsuite(test):
+                print "dadadadada"
                 self._tearDownPreviousClass(test, result)
                 self._handleModuleFixture(test, result)
                 self._handleClassSetUp(test, result)
@@ -103,12 +110,17 @@ class TestSuite(BaseTestSuite):
                 if (getattr(test.__class__, '_classSetupFailed', False) or
                     getattr(result, '_moduleSetUpFailed', False)):
                     continue
-
+            print "00-- begain just a debug "
+            print "11-- test: ",test
+            print "11-- test.run: ",test.run
+            print "11-- result: ",result
+            # 这个地方会调用case类中的 __call__ 方法，__call__ 方法中调用了run方法，具体的业务逻辑都是在run中定义的，比如首先执行setUp方法，再执行
+            # 测试函数，最后执行tearDown方法
             if not debug:
                 test(result)
             else:
                 test.debug()
-
+            print "00-- end just a debug "
         if topLevel:
             self._tearDownPreviousClass(None, result)
             self._handleModuleTearDown(result)
@@ -125,6 +137,8 @@ class TestSuite(BaseTestSuite):
     def _handleClassSetUp(self, test, result):
         previousClass = getattr(result, '_previousTestClass', None)
         currentClass = test.__class__
+        print "into _handleClassSetUp previousClass: ", previousClass
+        print "into _handleClassSetUp currentClass: ", currentClass
         if currentClass == previousClass:
             return
         if result._moduleSetUpFailed:
@@ -140,6 +154,7 @@ class TestSuite(BaseTestSuite):
             pass
 
         setUpClass = getattr(currentClass, 'setUpClass', None)
+        print "into _handleClassSetUp setUpClass: ", setUpClass
         if setUpClass is not None:
             _call_if_exists(result, '_setupStdout')
             try:
@@ -164,7 +179,9 @@ class TestSuite(BaseTestSuite):
 
     def _handleModuleFixture(self, test, result):
         previousModule = self._get_previous_module(result)
+        print "into _handleModuleFixture previousModule: ",previousModule
         currentModule = test.__class__.__module__
+        print "into _handleModuleFixture currentModule: ",currentModule
         if currentModule == previousModule:
             return
 
@@ -176,6 +193,7 @@ class TestSuite(BaseTestSuite):
         except KeyError:
             return
         setUpModule = getattr(module, 'setUpModule', None)
+        print "into _handleModuleFixture setUpModule: ",setUpModule
         if setUpModule is not None:
             _call_if_exists(result, '_setupStdout')
             try:
@@ -223,8 +241,12 @@ class TestSuite(BaseTestSuite):
                 _call_if_exists(result, '_restoreStdout')
 
     def _tearDownPreviousClass(self, test, result):
+        print "into _tearDownPreviousClass test: ",test
+        print "into _tearDownPreviousClass result: ",result
         previousClass = getattr(result, '_previousTestClass', None)
+        print "into _tearDownPreviousClass previousClass: ",previousClass
         currentClass = test.__class__
+        print "into _tearDownPreviousClass currentClass: ",currentClass
         if currentClass == previousClass:
             return
         if getattr(previousClass, '_classSetupFailed', False):
@@ -235,10 +257,12 @@ class TestSuite(BaseTestSuite):
             return
 
         tearDownClass = getattr(previousClass, 'tearDownClass', None)
+        print "into _tearDownPreviousClass tearDownClass: ",tearDownClass, tearDownClass.__class__
         if tearDownClass is not None:
             _call_if_exists(result, '_setupStdout')
             try:
                 tearDownClass()
+                print "end tearDownClass"
             except Exception, e:
                 if isinstance(result, _DebugResult):
                     raise

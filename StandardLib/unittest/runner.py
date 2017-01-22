@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Running tests"""
 
 import sys
@@ -140,21 +141,28 @@ class TextTestRunner(object):
     def run(self, test):
         "Run the given test case or test suite."
         result = self._makeResult()
+        print "- 3 into run result: ", result
+        print "- 3 into run test: ", test
         registerResult(result)
         result.failfast = self.failfast
         result.buffer = self.buffer
         startTime = time.time()
         startTestRun = getattr(result, 'startTestRun', None)
+        # print "- 3 into run dir(result): ", dir(result)
         if startTestRun is not None:
+            # 这个函数在源代码中使空的，为什么
             startTestRun()
         try:
+            # 执行测试代码
             test(result)
+            print "- 3 into run, end test case -- wfj"
         finally:
             stopTestRun = getattr(result, 'stopTestRun', None)
             if stopTestRun is not None:
                 stopTestRun()
         stopTime = time.time()
         timeTaken = stopTime - startTime
+        # 下面这个函数在result中也是空的，为什么
         result.printErrors()
         if hasattr(result, 'separator2'):
             self.stream.writeln(result.separator2)
@@ -165,6 +173,9 @@ class TextTestRunner(object):
 
         expectedFails = unexpectedSuccesses = skipped = 0
         try:
+            print "result.expectedFailures: ",result.expectedFailures
+            print "result.unexpectedSuccesses: ",result.unexpectedSuccesses
+            print "result.skipped: ",result.skipped
             results = map(len, (result.expectedFailures,
                                 result.unexpectedSuccesses,
                                 result.skipped))
