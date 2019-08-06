@@ -1,0 +1,6 @@
+1、git 忽略当前已经更改的文件
+    a、对于untrack的文件，可以建立.gitignore文件
+    b、对于track的文件，可以
+        git update-index --assume-unchanged <files>
+        git update-index --no-assume-unchanged <files>
+        上面一个是忽略，第二个是取消忽略
